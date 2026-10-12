@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Caelestia
+import Caelestia.Config
 import Caelestia.I18n
 import qs.components
 import qs.components.effects
@@ -15,6 +16,8 @@ MouseArea {
 
     required property LazyLoader loader
     required property ShellScreen screen
+
+    readonly property string mode: Screenshot.mode
 
     property bool onClient
 
@@ -138,7 +141,7 @@ MouseArea {
         if (root.loader.freeze) {
             save();
         } else {
-            overlay.visible = border.visible = false;
+            overlay.visible = border.visible = toolbar.visible = false;
             screencopy.visible = false;
             screencopy.active = true;
         }
@@ -278,6 +281,26 @@ MouseArea {
 
         Behavior on border.color {
             CAnim {}
+        }
+    }
+
+    Toolbar {
+        id: toolbar
+
+        property bool shown
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: shown && !root.loader.closing ? Tokens.padding.extraLarge : -height - Tokens.padding.large
+
+        mode: root.mode
+
+        onModeSelected: mode => Screenshot.mode = mode
+        onCloseRequested: closeAnim.start()
+
+        Component.onCompleted: shown = true
+
+        Behavior on y {
+            Anim {}
         }
     }
 
