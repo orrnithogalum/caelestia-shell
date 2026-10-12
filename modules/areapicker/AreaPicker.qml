@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 
+import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -72,6 +73,14 @@ Scope {
         }
 
         target: "picker"
+    }
+
+    Connections {
+        function onOpenRequested(freeze: bool, clipboardOnly: bool): void {
+            root.open(freeze, clipboardOnly);
+        }
+
+        target: Screenshot
     }
 
     // qmllint disable unresolved-type
