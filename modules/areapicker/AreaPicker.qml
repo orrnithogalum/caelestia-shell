@@ -15,6 +15,13 @@ Scope {
         property bool closing
         property bool clipboardOnly
 
+        function open(freeze: bool, clipboardOnly: bool): void {
+            root.freeze = freeze;
+            root.closing = false;
+            root.clipboardOnly = clipboardOnly;
+            root.activeAsync = true;
+        }
+
         Variants {
             model: Screens.screens
 
@@ -49,31 +56,19 @@ Scope {
 
     IpcHandler {
         function open(): void {
-            root.freeze = false;
-            root.closing = false;
-            root.clipboardOnly = false;
-            root.activeAsync = true;
+            root.open(false, false);
         }
 
         function openFreeze(): void {
-            root.freeze = true;
-            root.closing = false;
-            root.clipboardOnly = false;
-            root.activeAsync = true;
+            root.open(true, false);
         }
 
         function openClip(): void {
-            root.freeze = false;
-            root.closing = false;
-            root.clipboardOnly = true;
-            root.activeAsync = true;
+            root.open(false, true);
         }
 
         function openFreezeClip(): void {
-            root.freeze = true;
-            root.closing = false;
-            root.clipboardOnly = true;
-            root.activeAsync = true;
+            root.open(true, true);
         }
 
         target: "picker"
@@ -84,12 +79,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "screenshot"
         description: "Open screenshot tool"
-        onPressed: {
-            root.freeze = false;
-            root.closing = false;
-            root.clipboardOnly = false;
-            root.activeAsync = true;
-        }
+        onPressed: root.open(false, false)
     }
 
     // qmllint disable unresolved-type
@@ -97,12 +87,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "screenshotFreeze"
         description: "Open screenshot tool (freeze mode)"
-        onPressed: {
-            root.freeze = true;
-            root.closing = false;
-            root.clipboardOnly = false;
-            root.activeAsync = true;
-        }
+        onPressed: root.open(true, false)
     }
 
     // qmllint disable unresolved-type
@@ -110,12 +95,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "screenshotClip"
         description: "Open screenshot tool (clipboard)"
-        onPressed: {
-            root.freeze = false;
-            root.closing = false;
-            root.clipboardOnly = true;
-            root.activeAsync = true;
-        }
+        onPressed: root.open(false, true)
     }
 
     // qmllint disable unresolved-type
@@ -123,11 +103,6 @@ Scope {
         // qmllint enable unresolved-type
         name: "screenshotFreezeClip"
         description: "Open screenshot tool (freeze mode, clipboard)"
-        onPressed: {
-            root.freeze = true;
-            root.closing = false;
-            root.clipboardOnly = true;
-            root.activeAsync = true;
-        }
+        onPressed: root.open(true, true)
     }
 }
