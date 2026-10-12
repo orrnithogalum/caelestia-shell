@@ -235,8 +235,8 @@ MouseArea {
         id: overlay
 
         anchors.fill: parent
-        color: Colours.palette.m3secondaryContainer
-        opacity: 0.3
+        color: Colours.palette.m3scrim
+        opacity: 0.5
 
         layer.enabled: true
         layer.effect: Mask {
