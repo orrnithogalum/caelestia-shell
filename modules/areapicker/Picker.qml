@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -18,7 +19,7 @@ MouseArea {
     required property ShellScreen screen
 
     readonly property string mode: Screenshot.mode
-    readonly property bool hasSelection: mode !== "window" || onClient
+    readonly property bool hasSelection: mode !== "freeform" && (mode !== "window" || onClient)
     property bool capturing // Waiting for a frame to save, hides everything
     property bool done // A capture was made, the tool is closing
 
@@ -39,6 +40,8 @@ MouseArea {
     property real rsy: Math.min(sy, ey)
     property real sw: Math.abs(sx - ex)
     property real sh: Math.abs(sy - ey)
+
+    property var lassoPoints: []
 
     property list<var> clients: {
         const mon = Hypr.monitorFor(screen);
@@ -100,6 +103,7 @@ MouseArea {
 
     function setMode(newMode: string): void {
         Screenshot.mode = newMode;
+        lassoPoints = [];
 
         if (newMode === "screen") {
             // Like other snipping tools, picking full screen captures straight away
@@ -108,6 +112,23 @@ MouseArea {
         } else {
             checkClientRects(mouseX, mouseY);
         }
+    }
+
+    function addLassoPoint(x: real, y: real): void {
+        const pts = lassoPoints;
+        const last = pts[pts.length - 1];
+        // Skip points too close to the last one to keep the path light
+        if (last && Math.abs(last.x - x) + Math.abs(last.y - y) < 3)
+            return;
+        lassoPoints = [...pts, Qt.point(CUtils.clamp(x, 0, width), CUtils.clamp(y, 0, height))];
+    }
+
+    function lassoBounds(): rect {
+        const xs = lassoPoints.map(p => p.x);
+        const ys = lassoPoints.map(p => p.y);
+        const x = Math.floor(Math.min(...xs));
+        const y = Math.floor(Math.min(...ys));
+        return Qt.rect(x, y, Math.ceil(Math.max(...xs)) - x, Math.ceil(Math.max(...ys)) - y);
     }
 
     function capture(): void {
@@ -125,9 +146,10 @@ MouseArea {
     }
 
     function save(): void {
+        const freeform = mode === "freeform";
         const tmpfile = Qt.resolvedUrl(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
         // Use the target selection rather than the animated one
-        const area = Qt.rect(Math.ceil(Math.min(sx, ex)), Math.ceil(Math.min(sy, ey)), Math.floor(Math.abs(sx - ex)), Math.floor(Math.abs(sy - ey)));
+        const area = freeform ? lassoBounds() : Qt.rect(Math.ceil(Math.min(sx, ex)), Math.ceil(Math.min(sy, ey)), Math.floor(Math.abs(sx - ex)), Math.floor(Math.abs(sy - ey)));
 
         CUtils.saveItem(screencopy, tmpfile, area, path => {
             if (root.loader.clipboardOnly) {
@@ -141,7 +163,7 @@ MouseArea {
     }
 
     onClientsChanged: {
-        if (mode !== "screen")
+        if (mode !== "screen" && mode !== "freeform")
             checkClientRects(mouseX, mouseY);
     }
 
@@ -188,6 +210,9 @@ MouseArea {
     }
 
     onPressed: event => {
+        if (mode === "freeform")
+            lassoPoints = [Qt.point(event.x, event.y)];
+
         ssx = event.x;
         ssy = event.y;
     }
@@ -199,6 +224,15 @@ MouseArea {
         if (mode === "window" && !onClient)
             return;
 
+        // Ignore clicks and tiny scribbles
+        if (mode === "freeform") {
+            const bounds = lassoPoints.length > 2 ? lassoBounds() : Qt.rect(0, 0, 0, 0);
+            if (bounds.width < 5 || bounds.height < 5) {
+                lassoPoints = [];
+                return;
+            }
+        }
+
         capture();
     }
 
@@ -206,7 +240,10 @@ MouseArea {
         const x = event.x;
         const y = event.y;
 
-        if (mode === "region" && pressed) {
+        if (mode === "freeform") {
+            if (pressed)
+                addLassoPoint(x, y);
+        } else if (mode === "region" && pressed) {
             onClient = false;
             sx = ssx;
             sy = ssy;
@@ -263,7 +300,7 @@ MouseArea {
         command: ["hyprctl", "cursorpos", "-j"]
         stdout: StdioCollector {
             onStreamFinished: {
-                if (root.mode === "screen")
+                if (root.mode === "screen" || root.mode === "freeform")
                     return;
 
                 const pos = JSON.parse(text);
@@ -302,7 +339,7 @@ MouseArea {
 
         layer.enabled: true
         layer.effect: Mask {
-            maskSource: selectionWrapper
+            maskSource: root.mode === "freeform" ? lassoMask : selectionWrapper
             maskInverted: true
         }
     }
@@ -326,6 +363,29 @@ MouseArea {
         }
     }
 
+    Item {
+        id: lassoMask
+
+        anchors.fill: parent
+        layer.enabled: true
+        visible: false
+
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+
+            ShapePath {
+                strokeWidth: 0
+                strokeColor: "transparent"
+                fillColor: "black"
+
+                PathPolyline {
+                    path: root.lassoPoints
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: border
 
@@ -342,6 +402,26 @@ MouseArea {
 
         Behavior on border.color {
             CAnim {}
+        }
+    }
+
+    Shape {
+        id: lassoBorder
+
+        anchors.fill: parent
+        visible: !root.capturing && root.mode === "freeform"
+        preferredRendererType: Shape.CurveRenderer
+
+        ShapePath {
+            strokeWidth: 2
+            strokeColor: Colours.palette.m3primary
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            PathPolyline {
+                path: root.pressed ? root.lassoPoints : [...root.lassoPoints, root.lassoPoints[0]].filter(p => p)
+            }
         }
     }
 
