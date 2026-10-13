@@ -90,9 +90,24 @@ MouseArea {
             onClient = false;
     }
 
+    function selectScreen(): void {
+        onClient = false;
+        sx = 0;
+        sy = 0;
+        ex = screen.width;
+        ey = screen.height;
+    }
+
     function setMode(newMode: string): void {
         Screenshot.mode = newMode;
-        checkClientRects(mouseX, mouseY);
+
+        if (newMode === "screen") {
+            // Like other snipping tools, picking full screen captures straight away
+            selectScreen();
+            capture();
+        } else {
+            checkClientRects(mouseX, mouseY);
+        }
     }
 
     function capture(): void {
@@ -125,12 +140,21 @@ MouseArea {
         });
     }
 
-    onClientsChanged: checkClientRects(mouseX, mouseY)
+    onClientsChanged: {
+        if (mode !== "screen")
+            checkClientRects(mouseX, mouseY);
+    }
 
     anchors.fill: parent
     opacity: 0
     hoverEnabled: true
-    cursorShape: mode === "window" ? Qt.PointingHandCursor : Qt.CrossCursor
+    cursorShape: {
+        if (mode === "window")
+            return Qt.PointingHandCursor;
+        if (mode === "screen")
+            return Qt.ArrowCursor;
+        return Qt.CrossCursor;
+    }
 
     Component.onCompleted: {
         Hypr.extras.refreshOptions();
@@ -140,6 +164,11 @@ MouseArea {
             clients = clients;
 
         opacity = 1;
+
+        if (mode === "screen") {
+            selectScreen();
+            return;
+        }
 
         const ipc = clients[0]?.lastIpcObject;
         if (ipc?.at && ipc?.size) {
@@ -183,7 +212,7 @@ MouseArea {
             sy = ssy;
             ex = x;
             ey = y;
-        } else {
+        } else if (mode !== "screen") {
             checkClientRects(x, y);
         }
     }
@@ -234,6 +263,9 @@ MouseArea {
         command: ["hyprctl", "cursorpos", "-j"]
         stdout: StdioCollector {
             onStreamFinished: {
+                if (root.mode === "screen")
+                    return;
+
                 const pos = JSON.parse(text);
                 root.checkClientRects(pos.x - root.screen.x, pos.y - root.screen.y);
             }
