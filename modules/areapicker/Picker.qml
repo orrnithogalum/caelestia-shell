@@ -18,6 +18,7 @@ MouseArea {
     required property ShellScreen screen
 
     readonly property string mode: Screenshot.mode
+    readonly property bool hasSelection: mode !== "window" || onClient
     property bool capturing // Waiting for a frame to save, hides everything
     property bool done // A capture was made, the tool is closing
 
@@ -80,9 +81,18 @@ MouseArea {
                 sy = cy;
                 ex = cx + cw;
                 ey = cy + ch;
-                break;
+                return;
             }
         }
+
+        // Window mode can only select windows
+        if (mode === "window")
+            onClient = false;
+    }
+
+    function setMode(newMode: string): void {
+        Screenshot.mode = newMode;
+        checkClientRects(mouseX, mouseY);
     }
 
     function capture(): void {
@@ -120,7 +130,7 @@ MouseArea {
     anchors.fill: parent
     opacity: 0
     hoverEnabled: true
-    cursorShape: Qt.CrossCursor
+    cursorShape: mode === "window" ? Qt.PointingHandCursor : Qt.CrossCursor
 
     Component.onCompleted: {
         Hypr.extras.refreshOptions();
@@ -157,6 +167,9 @@ MouseArea {
         if (closeAnim.running || done)
             return;
 
+        if (mode === "window" && !onClient)
+            return;
+
         capture();
     }
 
@@ -164,7 +177,7 @@ MouseArea {
         const x = event.x;
         const y = event.y;
 
-        if (pressed) {
+        if (mode === "region" && pressed) {
             onClient = false;
             sx = ssx;
             sy = ssy;
@@ -272,6 +285,7 @@ MouseArea {
         Rectangle {
             id: selectionRect
 
+            visible: root.hasSelection
             radius: root.realRounding
             x: root.rsx
             y: root.rsy
@@ -283,7 +297,7 @@ MouseArea {
     Rectangle {
         id: border
 
-        visible: !root.capturing
+        visible: !root.capturing && root.hasSelection
         color: "transparent"
         radius: root.realRounding > 0 ? root.realRounding + root.realBorderWidth : 0
         border.width: root.realBorderWidth
@@ -310,7 +324,7 @@ MouseArea {
 
         mode: root.mode
 
-        onModeSelected: mode => Screenshot.mode = mode
+        onModeSelected: mode => root.setMode(mode)
         onCloseRequested: closeAnim.start()
 
         Component.onCompleted: shown = true
