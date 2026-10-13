@@ -151,7 +151,7 @@ MouseArea {
         // Use the target selection rather than the animated one
         const area = freeform ? lassoBounds() : Qt.rect(Math.ceil(Math.min(sx, ex)), Math.ceil(Math.min(sy, ey)), Math.floor(Math.abs(sx - ex)), Math.floor(Math.abs(sy - ey)));
 
-        CUtils.saveItem(screencopy, tmpfile, area, path => {
+        CUtils.saveItem(freeform ? freeformCapture : screencopy, tmpfile, area, path => {
             if (root.loader.clipboardOnly) {
                 Quickshell.execDetached(["sh", "-c", "wl-copy --type image/png < " + path]);
                 Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "-i", path, Tr.tr("Screenshot taken"), Tr.tr("Screenshot copied to clipboard")]);
@@ -325,6 +325,28 @@ MouseArea {
                     root.capturing = false;
                     root.save();
                 }
+            }
+        }
+    }
+
+    // Screen contents cut out to the freeform selection, only used for saving
+    // Hidden with opacity as grabbing an invisible item skips its layer effects
+    Item {
+        id: freeformCapture
+
+        anchors.fill: parent
+        opacity: 0
+
+        Item {
+            anchors.fill: parent
+            layer.enabled: root.mode === "freeform"
+            layer.effect: Mask {
+                maskSource: lassoMask
+            }
+
+            ShaderEffectSource {
+                anchors.fill: parent
+                sourceItem: root.mode === "freeform" ? screencopy.item : null
             }
         }
     }
