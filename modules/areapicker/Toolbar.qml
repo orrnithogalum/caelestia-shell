@@ -13,8 +13,10 @@ StyledRect {
     id: root
 
     required property string mode
+    property bool clipboardOnly
 
     signal modeSelected(mode: string)
+    signal clipboardOnlyToggled(checked: bool)
     signal closeRequested
 
     implicitWidth: layout.implicitWidth + Tokens.padding.small * 2
@@ -78,6 +80,16 @@ StyledRect {
             implicitWidth: 1
             implicitHeight: Tokens.font.icon.medium.pointSize * 1.5
             color: Colours.palette.m3outlineVariant
+        }
+
+        IconButton {
+            icon: "content_paste"
+            type: IconButton.Tonal
+            inactiveColour: Colours.tPalette.m3surfaceContainerHighest
+            inactiveOnColour: Colours.palette.m3onSurfaceVariant
+            isToggle: true
+            checked: root.clipboardOnly
+            onClicked: root.clipboardOnlyToggled(internalChecked)
         }
 
         IconButton {
