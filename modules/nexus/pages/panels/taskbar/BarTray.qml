@@ -61,6 +61,7 @@ PageBase {
         ToggleRow {
             first: true
             text: Tr.trCtx("Background", "taskbar tray: draw a background behind the tray")
+            disabled: !root.trayEnabled
             checked: Config.bar.tray.background
             onToggled: GlobalConfig.bar.tray.background = checked
         }
@@ -68,6 +69,7 @@ PageBase {
         ToggleRow {
             // TRANSLATORS: tint system tray icons with the theme accent colour
             text: Tr.tr("Recolour icons")
+            disabled: !root.trayEnabled
             checked: Config.bar.tray.recolour
             onToggled: GlobalConfig.bar.tray.recolour = checked
         }
@@ -75,6 +77,7 @@ PageBase {
         ToggleRow {
             last: true
             text: Tr.trCtx("Compact", "taskbar tray layout")
+            disabled: !root.trayEnabled
             checked: Config.bar.tray.compact
             onToggled: GlobalConfig.bar.tray.compact = checked
         }
@@ -89,6 +92,7 @@ PageBase {
             last: true
             text: Tr.tr("Popout on hover")
             subtext: Tr.tr("Show the tray menu popout when hovering")
+            disabled: !root.trayEnabled
             checked: Config.bar.popouts.tray
             onToggled: GlobalConfig.bar.popouts.tray = checked
         }
