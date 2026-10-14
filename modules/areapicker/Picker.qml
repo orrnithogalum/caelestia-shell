@@ -447,6 +447,53 @@ MouseArea {
         }
     }
 
+    Loader {
+        id: sizeLabel
+
+        readonly property bool shown: !root.done && root.hasSelection && root.sw > 0 && root.sh > 0
+
+        x: CUtils.clamp(root.rsx + (root.sw - width) / 2, Tokens.padding.large, root.width - width - Tokens.padding.large)
+        y: {
+            const below = root.rsy + root.sh + Tokens.spacing.medium;
+            if (below + height < root.height - Tokens.padding.large)
+                return below;
+            return root.rsy + root.sh - height - Tokens.spacing.medium;
+        }
+
+        active: shown || opacity > 0
+        visible: !root.capturing
+        opacity: shown ? 1 : 0
+        scale: shown ? 1 : 0.8
+
+        sourceComponent: StyledRect {
+            implicitWidth: sizeText.implicitWidth + Tokens.padding.medium * 2
+            implicitHeight: sizeText.implicitHeight + Tokens.padding.small
+
+            radius: Tokens.rounding.full
+            color: Colours.palette.m3inverseSurface
+
+            StyledText {
+                id: sizeText
+
+                anchors.centerIn: parent
+                // TRANSLATORS: selection size in pixels, %1 = width, %2 = height
+                text: Tr.tr("%1 × %2").arg(Math.round(Math.abs(root.sx - root.ex))).arg(Math.round(Math.abs(root.sy - root.ey)))
+                color: Colours.palette.m3inverseOnSurface
+                font: Tokens.font.label.large
+            }
+        }
+
+        Behavior on opacity {
+            Anim {
+                type: Anim.DefaultEffects
+            }
+        }
+
+        Behavior on scale {
+            Anim {}
+        }
+    }
+
     Toolbar {
         id: toolbar
 
