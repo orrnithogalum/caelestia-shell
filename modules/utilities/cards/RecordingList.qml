@@ -29,6 +29,28 @@ ColumnLayout {
     }
     readonly property real nonAnimHeight: header.implicitHeight + (expanded ? listHeight + spacing : 0)
 
+    function formatDate(baseName: string): string {
+        const matches = baseName.match(/^recording_(\d{4})(\d{2})(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
+        if (!matches)
+            return baseName;
+
+        const date = new Date(...matches.slice(1));
+        date.setMonth(date.getMonth() - 1); // Woe (months start from 0)
+
+        const time = Qt.formatTime(date, Units.twelveHourClock ? "h:mm a" : "hh:mm");
+        const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+
+        if (days === 0)
+            // TRANSLATORS: %1 = a clock time, e.g. 14:30
+            return Tr.tr("Today, %1").arg(time);
+        if (days === 1)
+            // TRANSLATORS: %1 = a clock time, e.g. 14:30
+            return Tr.tr("Yesterday, %1").arg(time);
+        // TRANSLATORS: %1 = a short date, e.g. 3 Oct, %2 = a clock time, e.g. 14:30
+        return Tr.tr("%1, %2").arg(date.toLocaleDateString(Qt.locale(), "d MMM")).arg(time);
+    }
+
     spacing: Tokens.spacing.small
 
     StyledRect {
@@ -152,15 +174,7 @@ ColumnLayout {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: {
-                        const time = recording.baseName;
-                        const matches = time.match(/^recording_(\d{4})(\d{2})(\d{2})_(\d{2})-(\d{2})-(\d{2})/);
-                        if (!matches)
-                            return time;
-                        const date = new Date(...matches.slice(1));
-                        date.setMonth(date.getMonth() - 1); // Woe (months start from 0)
-                        return Tr.tr("Recording at %1").arg(Qt.formatDateTime(date, Qt.locale()));
-                    }
+                    text: root.formatDate(recording.baseName)
                     color: Colours.palette.m3onSurfaceVariant
                     elide: Text.ElideRight
                 }
