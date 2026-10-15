@@ -72,11 +72,32 @@ StyledRect {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Recorder.paused ? Tr.trCtx("Paused", "recorder state") : Recorder.running ? Tr.trCtx("Running...", "recorder state") : Tr.trCtx("Ready", "recorder state")
+                    text: {
+                        if (Recorder.paused)
+                            return Tr.trCtx("Paused", "recorder state");
+                        if (!Recorder.running)
+                            return Tr.trCtx("Ready", "recorder state");
+
+                        const elapsed = Recorder.elapsed;
+
+                        const hours = Math.floor(elapsed / 3600);
+                        const mins = Math.floor((elapsed % 3600) / 60);
+                        const secs = Math.floor(elapsed % 60).toString().padStart(2, "0");
+
+                        let time;
+                        if (hours > 0)
+                            time = `${hours}:${mins.toString().padStart(2, "0")}:${secs}`;
+                        else
+                            time = `${mins}:${secs}`;
+
+                        // TRANSLATORS: %1 = elapsed recording duration, e.g. 01:23
+                        return Tr.tr("Recording for %1").arg(time);
+                    }
                     color: Colours.palette.m3onSurfaceVariant
                     font: Tokens.font.body.small
                     elide: Text.ElideRight
-                    animate: true
+                    // Don't fade every second while the timer ticks
+                    animate: !Recorder.running || Recorder.paused
                 }
             }
         }
@@ -248,26 +269,8 @@ StyledRect {
                 }
             }
 
-            StyledText {
+            Item {
                 Layout.fillWidth: true
-                text: {
-                    const elapsed = Recorder.elapsed;
-
-                    const hours = Math.floor(elapsed / 3600);
-                    const mins = Math.floor((elapsed % 3600) / 60);
-                    const secs = Math.floor(elapsed % 60).toString().padStart(2, "0");
-
-                    let time;
-                    if (hours > 0)
-                        time = `${hours}:${mins.toString().padStart(2, "0")}:${secs}`;
-                    else
-                        time = `${mins}:${secs}`;
-
-                    // TRANSLATORS: %1 = elapsed recording duration, e.g. 01:23
-                    return Tr.tr("Recording for %1").arg(time);
-                }
-                font: Tokens.font.body.medium
-                elide: Text.ElideMiddle
             }
 
             ButtonRow {
