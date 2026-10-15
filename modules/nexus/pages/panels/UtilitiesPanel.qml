@@ -66,8 +66,8 @@ PageBase {
         }
 
         ToggleRow {
-            text: Tr.tr("Screen recorder")
-            subtext: Tr.tr("Show the screen recorder card")
+            text: Tr.tr("Screen capture")
+            subtext: Tr.tr("Show the screenshot and recording card")
             checked: Config.utilities.cards.recorder
             onToggled: GlobalConfig.utilities.cards.recorder = checked
         }

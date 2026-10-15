@@ -1,10 +1,12 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Caelestia
+import Caelestia.Config
 import Caelestia.I18n
 import qs.components
 import qs.components.effects
@@ -15,6 +17,11 @@ MouseArea {
 
     required property LazyLoader loader
     required property ShellScreen screen
+
+    readonly property string mode: Screenshot.mode
+    readonly property bool hasSelection: mode !== "freeform" && (mode !== "window" || onClient)
+    property bool capturing // Waiting for a frame to save, hides everything
+    property bool done // A capture was made, the tool is closing
 
     property bool onClient
 
@@ -33,6 +40,8 @@ MouseArea {
     property real rsy: Math.min(sy, ey)
     property real sw: Math.abs(sx - ex)
     property real sh: Math.abs(sy - ey)
+
+    property var lassoPoints: []
 
     property list<var> clients: {
         const mon = Hypr.monitorFor(screen);
@@ -75,14 +84,74 @@ MouseArea {
                 sy = cy;
                 ex = cx + cw;
                 ey = cy + ch;
-                break;
+                return;
             }
+        }
+
+        // Window mode can only select windows
+        if (mode === "window")
+            onClient = false;
+    }
+
+    function selectScreen(): void {
+        onClient = false;
+        sx = 0;
+        sy = 0;
+        ex = screen.width;
+        ey = screen.height;
+    }
+
+    function setMode(newMode: string): void {
+        Screenshot.mode = newMode;
+        lassoPoints = [];
+
+        if (newMode === "screen") {
+            // Like other snipping tools, picking full screen captures straight away
+            selectScreen();
+            capture();
+        } else {
+            checkClientRects(mouseX, mouseY);
+        }
+    }
+
+    function addLassoPoint(x: real, y: real): void {
+        const pts = lassoPoints;
+        const last = pts[pts.length - 1];
+        // Skip points too close to the last one to keep the path light
+        if (last && Math.abs(last.x - x) + Math.abs(last.y - y) < 3)
+            return;
+        lassoPoints = [...pts, Qt.point(CUtils.clamp(x, 0, width), CUtils.clamp(y, 0, height))];
+    }
+
+    function lassoBounds(): rect {
+        const xs = lassoPoints.map(p => p.x);
+        const ys = lassoPoints.map(p => p.y);
+        const x = Math.floor(Math.min(...xs));
+        const y = Math.floor(Math.min(...ys));
+        return Qt.rect(x, y, Math.ceil(Math.max(...xs)) - x, Math.ceil(Math.max(...ys)) - y);
+    }
+
+    function capture(): void {
+        if (capturing || done)
+            return;
+
+        done = true;
+        if (loader.freeze) {
+            save();
+        } else {
+            capturing = true;
+            screencopy.visible = false;
+            screencopy.active = true;
         }
     }
 
     function save(): void {
+        const freeform = mode === "freeform";
         const tmpfile = Qt.resolvedUrl(`/tmp/caelestia-picker-${Quickshell.processId}-${Date.now()}.png`);
-        CUtils.saveItem(screencopy, tmpfile, Qt.rect(Math.ceil(rsx), Math.ceil(rsy), Math.floor(sw), Math.floor(sh)), path => {
+        // Use the target selection rather than the animated one
+        const area = freeform ? lassoBounds() : Qt.rect(Math.ceil(Math.min(sx, ex)), Math.ceil(Math.min(sy, ey)), Math.floor(Math.abs(sx - ex)), Math.floor(Math.abs(sy - ey)));
+
+        CUtils.saveItem(freeform ? freeformCapture : screencopy, tmpfile, area, path => {
             if (root.loader.clipboardOnly) {
                 Quickshell.execDetached(["sh", "-c", "wl-copy --type image/png < " + path]);
                 Quickshell.execDetached(["notify-send", "-a", "caelestia-cli", "-i", path, Tr.tr("Screenshot taken"), Tr.tr("Screenshot copied to clipboard")]);
@@ -93,12 +162,21 @@ MouseArea {
         });
     }
 
-    onClientsChanged: checkClientRects(mouseX, mouseY)
+    onClientsChanged: {
+        if (mode !== "screen" && mode !== "freeform")
+            checkClientRects(mouseX, mouseY);
+    }
 
     anchors.fill: parent
     opacity: 0
     hoverEnabled: true
-    cursorShape: Qt.CrossCursor
+    cursorShape: {
+        if (mode === "window")
+            return Qt.PointingHandCursor;
+        if (mode === "screen")
+            return Qt.ArrowCursor;
+        return Qt.CrossCursor;
+    }
 
     Component.onCompleted: {
         Hypr.extras.refreshOptions();
@@ -108,6 +186,11 @@ MouseArea {
             clients = clients;
 
         opacity = 1;
+
+        if (mode === "screen") {
+            selectScreen();
+            return;
+        }
 
         const ipc = clients[0]?.lastIpcObject;
         if (ipc?.at && ipc?.size) {
@@ -127,34 +210,46 @@ MouseArea {
     }
 
     onPressed: event => {
+        if (mode === "freeform")
+            lassoPoints = [Qt.point(event.x, event.y)];
+
         ssx = event.x;
         ssy = event.y;
     }
 
     onReleased: {
-        if (closeAnim.running)
+        if (closeAnim.running || done)
             return;
 
-        if (root.loader.freeze) {
-            save();
-        } else {
-            overlay.visible = border.visible = false;
-            screencopy.visible = false;
-            screencopy.active = true;
+        if (mode === "window" && !onClient)
+            return;
+
+        // Ignore clicks and tiny scribbles
+        if (mode === "freeform") {
+            const bounds = lassoPoints.length > 2 ? lassoBounds() : Qt.rect(0, 0, 0, 0);
+            if (bounds.width < 5 || bounds.height < 5) {
+                lassoPoints = [];
+                return;
+            }
         }
+
+        capture();
     }
 
     onPositionChanged: event => {
         const x = event.x;
         const y = event.y;
 
-        if (pressed) {
+        if (mode === "freeform") {
+            if (pressed)
+                addLassoPoint(x, y);
+        } else if (mode === "region" && pressed) {
             onClient = false;
             sx = ssx;
             sy = ssy;
             ex = x;
             ey = y;
-        } else {
+        } else if (mode !== "screen") {
             checkClientRects(x, y);
         }
     }
@@ -205,6 +300,9 @@ MouseArea {
         command: ["hyprctl", "cursorpos", "-j"]
         stdout: StdioCollector {
             onStreamFinished: {
+                if (root.mode === "screen" || root.mode === "freeform")
+                    return;
+
                 const pos = JSON.parse(text);
                 root.checkClientRects(pos.x - root.screen.x, pos.y - root.screen.y);
             }
@@ -224,9 +322,31 @@ MouseArea {
 
             onHasContentChanged: {
                 if (hasContent && !root.loader.freeze) {
-                    overlay.visible = border.visible = true;
+                    root.capturing = false;
                     root.save();
                 }
+            }
+        }
+    }
+
+    // Screen contents cut out to the freeform selection, only used for saving
+    // Hidden with opacity as grabbing an invisible item skips its layer effects
+    Item {
+        id: freeformCapture
+
+        anchors.fill: parent
+        opacity: 0
+
+        Item {
+            anchors.fill: parent
+            layer.enabled: root.mode === "freeform"
+            layer.effect: Mask {
+                maskSource: lassoMask
+            }
+
+            ShaderEffectSource {
+                anchors.fill: parent
+                sourceItem: root.mode === "freeform" ? screencopy.item : null
             }
         }
     }
@@ -235,12 +355,13 @@ MouseArea {
         id: overlay
 
         anchors.fill: parent
-        color: Colours.palette.m3secondaryContainer
-        opacity: 0.3
+        color: Colours.palette.m3scrim
+        opacity: 0.5
+        visible: !root.capturing
 
         layer.enabled: true
         layer.effect: Mask {
-            maskSource: selectionWrapper
+            maskSource: root.mode === "freeform" ? lassoMask : selectionWrapper
             maskInverted: true
         }
     }
@@ -255,6 +376,7 @@ MouseArea {
         Rectangle {
             id: selectionRect
 
+            visible: root.hasSelection
             radius: root.realRounding
             x: root.rsx
             y: root.rsy
@@ -263,9 +385,33 @@ MouseArea {
         }
     }
 
+    Item {
+        id: lassoMask
+
+        anchors.fill: parent
+        layer.enabled: true
+        visible: false
+
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+
+            ShapePath {
+                strokeWidth: 0
+                strokeColor: "transparent"
+                fillColor: "black"
+
+                PathPolyline {
+                    path: root.lassoPoints
+                }
+            }
+        }
+    }
+
     Rectangle {
         id: border
 
+        visible: !root.capturing && root.hasSelection
         color: "transparent"
         radius: root.realRounding > 0 ? root.realRounding + root.realBorderWidth : 0
         border.width: root.realBorderWidth
@@ -278,6 +424,99 @@ MouseArea {
 
         Behavior on border.color {
             CAnim {}
+        }
+    }
+
+    Shape {
+        id: lassoBorder
+
+        anchors.fill: parent
+        visible: !root.capturing && root.mode === "freeform"
+        preferredRendererType: Shape.CurveRenderer
+
+        ShapePath {
+            strokeWidth: 2
+            strokeColor: Colours.palette.m3primary
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+
+            PathPolyline {
+                path: root.pressed ? root.lassoPoints : [...root.lassoPoints, root.lassoPoints[0]].filter(p => p)
+            }
+        }
+    }
+
+    Loader {
+        id: sizeLabel
+
+        readonly property bool shown: !root.done && root.hasSelection && root.sw > 0 && root.sh > 0
+
+        x: CUtils.clamp(root.rsx + (root.sw - width) / 2, Tokens.padding.large, root.width - width - Tokens.padding.large)
+        y: {
+            const below = root.rsy + root.sh + Tokens.spacing.medium;
+            if (below + height < root.height - Tokens.padding.large)
+                return below;
+            return root.rsy + root.sh - height - Tokens.spacing.medium;
+        }
+
+        active: shown || opacity > 0
+        visible: !root.capturing
+        opacity: shown ? 1 : 0
+        scale: shown ? 1 : 0.8
+
+        sourceComponent: StyledRect {
+            implicitWidth: sizeText.implicitWidth + Tokens.padding.medium * 2
+            implicitHeight: sizeText.implicitHeight + Tokens.padding.small
+
+            radius: Tokens.rounding.full
+            color: Colours.palette.m3inverseSurface
+
+            StyledText {
+                id: sizeText
+
+                anchors.centerIn: parent
+                // TRANSLATORS: selection size in pixels, %1 = width, %2 = height
+                text: Tr.tr("%1 × %2").arg(Math.round(Math.abs(root.sx - root.ex))).arg(Math.round(Math.abs(root.sy - root.ey)))
+                color: Colours.palette.m3inverseOnSurface
+                font: Tokens.font.label.large
+            }
+        }
+
+        Behavior on opacity {
+            Anim {
+                type: Anim.DefaultEffects
+            }
+        }
+
+        Behavior on scale {
+            Anim {}
+        }
+    }
+
+    Toolbar {
+        id: toolbar
+
+        property bool shown
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: shown && !root.done && !root.loader.closing ? Tokens.padding.extraLarge : -height - Tokens.padding.large
+        visible: !root.capturing && !root.done
+
+        mode: root.mode
+        clipboardOnly: root.loader.clipboardOnly
+
+        onModeSelected: mode => root.setMode(mode)
+        onClipboardOnlyToggled: checked => {
+            root.loader.clipboardOnly = checked;
+            Screenshot.clipboard = checked;
+        }
+        onCloseRequested: closeAnim.start()
+
+        Component.onCompleted: shown = true
+
+        Behavior on y {
+            Anim {}
         }
     }
 

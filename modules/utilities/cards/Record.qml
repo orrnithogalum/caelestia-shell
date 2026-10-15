@@ -15,7 +15,7 @@ StyledRect {
 
     required property var props
     required property ScreenState screenState
-    readonly property real nonAnimHeight: btnLayout.implicitHeight + listOrControls.implicitHeight + layout.spacing + layout.anchors.margins * 2
+    readonly property real nonAnimHeight: header.implicitHeight + actionsOrControls.implicitHeight + recordings.nonAnimHeight + layout.spacing * 2 + layout.anchors.margins * 2
 
     implicitHeight: layout.implicitHeight + layout.anchors.margins * 2
 
@@ -34,7 +34,7 @@ StyledRect {
         spacing: Tokens.spacing.medium
 
         RowLayout {
-            id: btnLayout
+            id: header
 
             spacing: Tokens.spacing.medium
 
@@ -65,18 +65,124 @@ StyledRect {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Tr.tr("Screen recorder")
+                    text: Tr.tr("Screen capture")
                     font: Tokens.font.body.medium
                     elide: Text.ElideRight
                 }
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Recorder.paused ? Tr.trCtx("Paused", "recorder state") : Recorder.running ? Tr.trCtx("Running...", "recorder state") : Tr.trCtx("Ready", "recorder state")
+                    text: {
+                        if (Recorder.paused)
+                            return Tr.trCtx("Paused", "recorder state");
+                        if (!Recorder.running)
+                            return Tr.trCtx("Ready", "recorder state");
+
+                        const elapsed = Recorder.elapsed;
+
+                        const hours = Math.floor(elapsed / 3600);
+                        const mins = Math.floor((elapsed % 3600) / 60);
+                        const secs = Math.floor(elapsed % 60).toString().padStart(2, "0");
+
+                        let time;
+                        if (hours > 0)
+                            time = `${hours}:${mins.toString().padStart(2, "0")}:${secs}`;
+                        else
+                            time = `${mins}:${secs}`;
+
+                        // TRANSLATORS: %1 = elapsed recording duration, e.g. 01:23
+                        return Tr.tr("Recording for %1").arg(time);
+                    }
                     color: Colours.palette.m3onSurfaceVariant
                     font: Tokens.font.body.small
                     elide: Text.ElideRight
-                    animate: true
+                    // Don't fade every second while the timer ticks
+                    animate: !Recorder.running || Recorder.paused
+                }
+            }
+        }
+
+        Loader {
+            id: actionsOrControls
+
+            property bool running: Recorder.running
+
+            asynchronous: true
+            Layout.fillWidth: true
+            Layout.preferredHeight: implicitHeight
+            sourceComponent: running ? recordingControls : captureActions
+            clip: Layout.preferredHeight < implicitHeight
+
+            Behavior on Layout.preferredHeight {
+                id: locHeightAnim
+
+                enabled: false
+
+                Anim {}
+            }
+
+            Behavior on running {
+                SequentialAnimation {
+                    Anim {
+                        target: actionsOrControls
+                        property: "opacity"
+                        to: 0
+                        type: Anim.DefaultEffects
+                    }
+                    PropertyAction {
+                        target: locHeightAnim
+                        property: "enabled"
+                        value: true
+                    }
+                    PropertyAction {}
+                    ParallelAnimation {
+                        SequentialAnimation {
+                            PauseAnimation {
+                                duration: 100
+                            }
+                            PropertyAction {
+                                target: locHeightAnim
+                                property: "enabled"
+                                value: false
+                            }
+                        }
+                        Anim {
+                            target: actionsOrControls
+                            property: "opacity"
+                            to: 1
+                            type: Anim.SlowEffects
+                        }
+                    }
+                }
+            }
+        }
+
+        RecordingList {
+            id: recordings
+
+            Layout.fillWidth: true
+            props: root.props
+            screenState: root.screenState
+        }
+    }
+
+    Component {
+        id: captureActions
+
+        RowLayout {
+            spacing: Tokens.spacing.small
+
+            IconTextButton {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                type: TextButton.Tonal
+                icon: "screenshot_region"
+                text: Tr.tr("Screenshot")
+
+                onClicked: {
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
+                    Screenshot.open();
                 }
             }
 
@@ -113,70 +219,6 @@ StyledRect {
                     }
                 ]
             }
-        }
-
-        Loader {
-            id: listOrControls
-
-            property bool running: Recorder.running
-
-            asynchronous: true
-            Layout.fillWidth: true
-            Layout.preferredHeight: implicitHeight
-            sourceComponent: running ? recordingControls : recordingList
-            clip: Layout.preferredHeight < implicitHeight
-
-            Behavior on Layout.preferredHeight {
-                id: locHeightAnim
-
-                enabled: false
-
-                Anim {}
-            }
-
-            Behavior on running {
-                SequentialAnimation {
-                    Anim {
-                        target: listOrControls
-                        property: "opacity"
-                        to: 0
-                        type: Anim.DefaultEffects
-                    }
-                    PropertyAction {
-                        target: locHeightAnim
-                        property: "enabled"
-                        value: true
-                    }
-                    PropertyAction {}
-                    ParallelAnimation {
-                        SequentialAnimation {
-                            PauseAnimation {
-                                duration: 100
-                            }
-                            PropertyAction {
-                                target: locHeightAnim
-                                property: "enabled"
-                                value: false
-                            }
-                        }
-                        Anim {
-                            target: listOrControls
-                            property: "opacity"
-                            to: 1
-                            type: Anim.SlowEffects
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: recordingList
-
-        RecordingList {
-            props: root.props
-            screenState: root.screenState
         }
     }
 
@@ -227,26 +269,8 @@ StyledRect {
                 }
             }
 
-            StyledText {
+            Item {
                 Layout.fillWidth: true
-                text: {
-                    const elapsed = Recorder.elapsed;
-
-                    const hours = Math.floor(elapsed / 3600);
-                    const mins = Math.floor((elapsed % 3600) / 60);
-                    const secs = Math.floor(elapsed % 60).toString().padStart(2, "0");
-
-                    let time;
-                    if (hours > 0)
-                        time = `${hours}:${mins.toString().padStart(2, "0")}:${secs}`;
-                    else
-                        time = `${mins}:${secs}`;
-
-                    // TRANSLATORS: %1 = elapsed recording duration, e.g. 01:23
-                    return Tr.tr("Recording for %1").arg(time);
-                }
-                font: Tokens.font.body.medium
-                elide: Text.ElideMiddle
             }
 
             ButtonRow {

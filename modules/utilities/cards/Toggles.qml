@@ -5,7 +5,6 @@ import QtQuick.Layouts
 import Quickshell.Bluetooth
 import Caelestia.Components
 import Caelestia.Config
-import Caelestia.I18n
 import qs.components
 import qs.components.controls
 import qs.services
@@ -40,7 +39,7 @@ StyledRect {
     readonly property int splitIndex: Math.ceil(quickToggles.length / 2)
     readonly property bool needExtraRow: quickToggles.length > 6
 
-    implicitHeight: layout.implicitHeight + Tokens.padding.extraLargeIncreased
+    implicitHeight: layout.implicitHeight + layout.anchors.margins * 2
 
     radius: Tokens.rounding.large
     color: Colours.tPalette.m3surfaceContainer
@@ -51,11 +50,6 @@ StyledRect {
         anchors.fill: parent
         anchors.margins: Tokens.padding.large
         spacing: Tokens.spacing.medium
-
-        StyledText {
-            text: Tr.tr("Quick toggles")
-            font: Tokens.font.body.medium
-        }
 
         QuickToggleRow {
             model: root.needExtraRow ? root.quickToggles.slice(0, root.splitIndex) : root.quickToggles

@@ -9,13 +9,12 @@ import qs.services
 StyledRect {
     id: root
 
-    readonly property real nonAnimHeight: layout.implicitHeight + (IdleInhibitor.enabled ? activeChip.implicitHeight + activeChip.anchors.topMargin : 0) + Tokens.padding.extraLargeIncreased
+    readonly property real nonAnimHeight: implicitHeight
 
-    implicitHeight: nonAnimHeight
+    implicitHeight: layout.implicitHeight + layout.anchors.margins * 2
 
     radius: Tokens.rounding.large
     color: Colours.tPalette.m3surfaceContainer
-    clip: true
 
     RowLayout {
         id: layout
@@ -56,16 +55,20 @@ StyledRect {
 
             StyledText {
                 Layout.fillWidth: true
+
                 text: {
                     if (IdleInhibitor.clamshell)
                         return Tr.trCtx("Preventing sleep (clamshell mode)", "idle inhibitor");
                     if (IdleInhibitor.enabled)
-                        return Tr.trCtx("Preventing sleep mode", "idle inhibitor");
+                        // TRANSLATORS: %1 = a clock time, e.g. 14:30
+                        return Tr.tr("Active since %1").arg(Qt.formatTime(IdleInhibitor.enabledSince, Units.twelveHourClock ? "hh:mm a" : "hh:mm"));
                     return Tr.trCtx("Normal power management", "idle inhibitor");
                 }
+
                 color: Colours.palette.m3onSurfaceVariant
                 font: Tokens.font.body.small
                 elide: Text.ElideRight
+                animate: true
             }
         }
 
@@ -73,57 +76,5 @@ StyledRect {
             checked: IdleInhibitor.enabled
             onToggled: IdleInhibitor.enabled = checked
         }
-    }
-
-    Loader {
-        id: activeChip
-
-        asynchronous: true
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.topMargin: Tokens.spacing.large
-        anchors.bottomMargin: IdleInhibitor.enabled ? Tokens.padding.large : -implicitHeight
-        anchors.leftMargin: Tokens.padding.large
-
-        opacity: IdleInhibitor.enabled ? 1 : 0
-        scale: IdleInhibitor.enabled ? 1 : 0.5
-
-        Component.onCompleted: active = Qt.binding(() => opacity > 0)
-
-        sourceComponent: StyledRect {
-            implicitWidth: activeText.implicitWidth + Tokens.padding.medium * 2
-            implicitHeight: activeText.implicitHeight + Tokens.padding.small
-
-            radius: Tokens.rounding.full
-            color: Colours.palette.m3primary
-
-            StyledText {
-                id: activeText
-
-                anchors.centerIn: parent
-                // TRANSLATORS: %1 = a clock time, e.g. 14:30
-                text: Tr.tr("Active since %1").arg(Qt.formatTime(IdleInhibitor.enabledSince, Units.twelveHourClock ? "hh:mm a" : "hh:mm"))
-                color: Colours.palette.m3onPrimary
-                font: Tokens.font.body.builders.small.size(Math.round(Tokens.font.body.small.pointSize * 0.9)).build()
-            }
-        }
-
-        Behavior on anchors.bottomMargin {
-            Anim {}
-        }
-
-        Behavior on opacity {
-            Anim {
-                type: Anim.StandardSmall
-            }
-        }
-
-        Behavior on scale {
-            Anim {}
-        }
-    }
-
-    Behavior on implicitHeight {
-        Anim {}
     }
 }
