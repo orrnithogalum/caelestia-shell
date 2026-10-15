@@ -18,6 +18,7 @@ ColumnLayout {
 
     required property var props
     required property ScreenState screenState
+    readonly property real nonAnimHeight: implicitHeight
 
     spacing: 0
 

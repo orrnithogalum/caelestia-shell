@@ -15,7 +15,7 @@ StyledRect {
 
     required property var props
     required property ScreenState screenState
-    readonly property real nonAnimHeight: btnLayout.implicitHeight + listOrControls.implicitHeight + layout.spacing + layout.anchors.margins * 2
+    readonly property real nonAnimHeight: header.implicitHeight + actionsOrControls.implicitHeight + recordings.nonAnimHeight + layout.spacing * 2 + layout.anchors.margins * 2
 
     implicitHeight: layout.implicitHeight + layout.anchors.margins * 2
 
@@ -34,7 +34,7 @@ StyledRect {
         spacing: Tokens.spacing.medium
 
         RowLayout {
-            id: btnLayout
+            id: header
 
             spacing: Tokens.spacing.medium
 
@@ -65,7 +65,7 @@ StyledRect {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Tr.tr("Screen recorder")
+                    text: Tr.tr("Screen capture")
                     font: Tokens.font.body.medium
                     elide: Text.ElideRight
                 }
@@ -77,6 +77,91 @@ StyledRect {
                     font: Tokens.font.body.small
                     elide: Text.ElideRight
                     animate: true
+                }
+            }
+        }
+
+        Loader {
+            id: actionsOrControls
+
+            property bool running: Recorder.running
+
+            asynchronous: true
+            Layout.fillWidth: true
+            Layout.preferredHeight: implicitHeight
+            sourceComponent: running ? recordingControls : captureActions
+            clip: Layout.preferredHeight < implicitHeight
+
+            Behavior on Layout.preferredHeight {
+                id: locHeightAnim
+
+                enabled: false
+
+                Anim {}
+            }
+
+            Behavior on running {
+                SequentialAnimation {
+                    Anim {
+                        target: actionsOrControls
+                        property: "opacity"
+                        to: 0
+                        type: Anim.DefaultEffects
+                    }
+                    PropertyAction {
+                        target: locHeightAnim
+                        property: "enabled"
+                        value: true
+                    }
+                    PropertyAction {}
+                    ParallelAnimation {
+                        SequentialAnimation {
+                            PauseAnimation {
+                                duration: 100
+                            }
+                            PropertyAction {
+                                target: locHeightAnim
+                                property: "enabled"
+                                value: false
+                            }
+                        }
+                        Anim {
+                            target: actionsOrControls
+                            property: "opacity"
+                            to: 1
+                            type: Anim.SlowEffects
+                        }
+                    }
+                }
+            }
+        }
+
+        RecordingList {
+            id: recordings
+
+            Layout.fillWidth: true
+            props: root.props
+            screenState: root.screenState
+        }
+    }
+
+    Component {
+        id: captureActions
+
+        RowLayout {
+            spacing: Tokens.spacing.small
+
+            IconTextButton {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                type: TextButton.Tonal
+                icon: "screenshot_region"
+                text: Tr.tr("Screenshot")
+
+                onClicked: {
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
+                    Screenshot.open();
                 }
             }
 
@@ -113,70 +198,6 @@ StyledRect {
                     }
                 ]
             }
-        }
-
-        Loader {
-            id: listOrControls
-
-            property bool running: Recorder.running
-
-            asynchronous: true
-            Layout.fillWidth: true
-            Layout.preferredHeight: implicitHeight
-            sourceComponent: running ? recordingControls : recordingList
-            clip: Layout.preferredHeight < implicitHeight
-
-            Behavior on Layout.preferredHeight {
-                id: locHeightAnim
-
-                enabled: false
-
-                Anim {}
-            }
-
-            Behavior on running {
-                SequentialAnimation {
-                    Anim {
-                        target: listOrControls
-                        property: "opacity"
-                        to: 0
-                        type: Anim.DefaultEffects
-                    }
-                    PropertyAction {
-                        target: locHeightAnim
-                        property: "enabled"
-                        value: true
-                    }
-                    PropertyAction {}
-                    ParallelAnimation {
-                        SequentialAnimation {
-                            PauseAnimation {
-                                duration: 100
-                            }
-                            PropertyAction {
-                                target: locHeightAnim
-                                property: "enabled"
-                                value: false
-                            }
-                        }
-                        Anim {
-                            target: listOrControls
-                            property: "opacity"
-                            to: 1
-                            type: Anim.SlowEffects
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Component {
-        id: recordingList
-
-        RecordingList {
-            props: root.props
-            screenState: root.screenState
         }
     }
 
