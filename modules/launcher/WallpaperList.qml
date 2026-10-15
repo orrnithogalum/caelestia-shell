@@ -7,6 +7,8 @@ import Caelestia.Config
 import qs.components.controls
 import qs.services
 
+// M3 hero carousel: the current wallpaper is large, its neighbours shrink into
+// narrower and narrower slivers that widen again as they move to the centre
 PathView {
     id: root
 
@@ -15,7 +17,11 @@ PathView {
     required property var panels
     required property var content
 
-    readonly property int itemWidth: Tokens.sizes.launcher.wallpaperWidth * 0.8 + Tokens.padding.medium * 2
+    readonly property real itemHeight: Tokens.sizes.launcher.wallpaperHeight - Tokens.padding.medium * 2
+    readonly property real largeWidth: Math.round(itemHeight * 16 / 9)
+    readonly property real mediumWidth: Math.round(largeWidth * 0.35)
+    readonly property real smallWidth: Math.round(Tokens.sizes.launcher.wallpaperHeight * 0.28)
+    readonly property real gap: Tokens.spacing.small
 
     readonly property int numItems: {
         const screen = (QsWindow.window as QsWindow)?.screen;
@@ -31,17 +37,33 @@ PathView {
             outerMargins = panels.utilities.implicitWidth;
         const maxWidth = screen.width - Config.border.rounding * 4 - (barMargins + outerMargins) * 2;
 
-        if (maxWidth <= 0)
+        // Largest odd amount of items that fits
+        let visible = Math.min(Config.launcher.maxWallpapers, scriptModel.values.length);
+        if (visible % 2 === 0)
+            visible--;
+        while (visible > 1 && totalWidth(visible) > maxWidth)
+            visible -= 2;
+
+        if (visible < 1 || totalWidth(visible) > maxWidth)
             return 0;
-
-        const maxItemsOnScreen = Math.floor(maxWidth / itemWidth);
-        const visible = Math.min(maxItemsOnScreen, Config.launcher.maxWallpapers, scriptModel.values.length);
-
-        if (visible === 2)
-            return 1;
-        if (visible > 1 && visible % 2 === 0)
-            return visible - 1;
         return visible;
+    }
+
+    // Width of the item n slots away from the centre
+    function slotWidth(n: int): real {
+        if (n === 0)
+            return largeWidth;
+        if (n === 1)
+            return mediumWidth;
+        return smallWidth;
+    }
+
+    // Width of all the items in a carousel showing count items
+    function totalWidth(count: int): real {
+        let w = 0;
+        for (let i = 0; i < count; i++)
+            w += slotWidth(Math.abs(i - (count - 1) / 2));
+        return w + Math.max(0, count - 1) * gap;
     }
 
     model: ScriptModel {
@@ -61,37 +83,44 @@ PathView {
             Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
     }
 
-    implicitWidth: Math.min(numItems, count) * itemWidth
+    implicitWidth: totalWidth(numItems)
     pathItemCount: numItems
     cacheItemCount: 4
+    clip: true
 
     snapMode: PathView.SnapToItem
     preferredHighlightBegin: 0.5
     preferredHighlightEnd: 0.5
     highlightRangeMode: PathView.StrictlyEnforceRange
+    highlightMoveDuration: Tokens.anim.durations.expressiveDefaultSpatial
 
     delegate: WallpaperItem {
         screenState: root.screenState
+        slots: root.numItems
+        itemHeight: root.itemHeight
+        largeWidth: root.largeWidth
+        mediumWidth: root.mediumWidth
+        smallWidth: root.smallWidth
+        gap: root.gap
+        slotSpacing: root.width / Math.max(1, root.numItems)
     }
 
+    // Straight line, items get their distance from the centre (in items) from the pos attribute
     path: Path {
+        startX: 0
         startY: root.height / 2
 
         PathAttribute {
-            name: "z"
-            value: 0
-        }
-        PathLine {
-            x: root.width / 2
-            relativeY: 0
-        }
-        PathAttribute {
-            name: "z"
-            value: 1
+            name: "pos"
+            value: -root.numItems / 2
         }
         PathLine {
             x: root.width
             relativeY: 0
+        }
+        PathAttribute {
+            name: "pos"
+            value: root.numItems / 2
         }
     }
 
