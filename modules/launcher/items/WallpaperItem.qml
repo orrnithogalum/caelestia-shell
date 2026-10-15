@@ -100,6 +100,13 @@ Item {
             smooth: !root.PathView.view.moving
         }
 
+        // Dim the side items so the centred one stands out
+        Rectangle {
+            anchors.fill: parent
+            color: Colours.palette.m3scrim
+            opacity: (1 - root.focusAmount) * 0.35
+        }
+
         // Scrim so the name is readable on any wallpaper
         Rectangle {
             anchors.left: parent.left
