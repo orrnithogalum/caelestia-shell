@@ -507,7 +507,10 @@ MouseArea {
         clipboardOnly: root.loader.clipboardOnly
 
         onModeSelected: mode => root.setMode(mode)
-        onClipboardOnlyToggled: checked => root.loader.clipboardOnly = checked
+        onClipboardOnlyToggled: checked => {
+            root.loader.clipboardOnly = checked;
+            Screenshot.clipboard = checked;
+        }
         onCloseRequested: closeAnim.start()
 
         Component.onCompleted: shown = true

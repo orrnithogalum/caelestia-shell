@@ -19,7 +19,7 @@ Scope {
         function open(freeze: bool, clipboardOnly: bool): void {
             root.freeze = freeze;
             root.closing = false;
-            root.clipboardOnly = clipboardOnly;
+            root.clipboardOnly = clipboardOnly || Screenshot.clipboard;
             root.activeAsync = true;
         }
 
