@@ -75,6 +75,11 @@ PathView {
         return w + Math.max(0, count - 1) * gap;
     }
 
+    function previewCurrent(): void {
+        if (currentItem)
+            Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
+    }
+
     model: ScriptModel {
         id: scriptModel
 
@@ -94,9 +99,19 @@ PathView {
         moveReset.restart();
     }
 
+    // Previewing loads the full wallpaper and its colours, so only preview the first and last
+    // wallpaper when scrolling quickly instead of every one passed on the way
     onCurrentItemChanged: {
-        if (currentItem)
-            Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
+        if (!currentItem)
+            return;
+
+        if (previewDelay.running) {
+            previewDelay.pending = true;
+            previewDelay.restart();
+        } else {
+            previewCurrent();
+            previewDelay.start();
+        }
     }
 
     implicitWidth: totalWidth(numItems)
@@ -146,6 +161,20 @@ PathView {
 
         interval: 250
         onTriggered: root.moveDuration = Tokens.anim.durations.expressiveDefaultSpatial
+    }
+
+    Timer {
+        id: previewDelay
+
+        property bool pending
+
+        interval: 200
+        onTriggered: {
+            if (pending) {
+                pending = false;
+                root.previewCurrent();
+            }
+        }
     }
 
     CustomMouseArea {
