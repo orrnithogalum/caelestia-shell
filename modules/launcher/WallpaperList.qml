@@ -52,6 +52,12 @@ PathView {
     // Extra item on each side so items can shrink out/grow in at the edges while scrolling
     readonly property int pathItems: Math.min(numItems + 2, count)
 
+    // Every index change restarts the move animation from a standstill, so when an arrow key is
+    // held the carousel falls behind and then spins to catch up on release. Shorten the move to
+    // match how quickly the index is changing so it keeps up instead.
+    property real lastIndexChange
+    property int moveDuration: Tokens.anim.durations.expressiveDefaultSpatial
+
     // Width of the item n slots away from the centre
     function slotWidth(n: int): real {
         if (n === 0)
@@ -81,6 +87,13 @@ PathView {
     Component.onCompleted: currentIndex = Wallpapers.list.findIndex(w => w.path === Wallpapers.actualCurrent)
     Component.onDestruction: Wallpapers.stopPreview()
 
+    onCurrentIndexChanged: {
+        const now = Date.now();
+        moveDuration = Math.min(Tokens.anim.durations.expressiveDefaultSpatial, (now - lastIndexChange) * 1.2);
+        lastIndexChange = now;
+        moveReset.restart();
+    }
+
     onCurrentItemChanged: {
         if (currentItem)
             Wallpapers.preview((currentItem as WallpaperItem).modelData.path);
@@ -95,7 +108,7 @@ PathView {
     preferredHighlightBegin: 0.5
     preferredHighlightEnd: 0.5
     highlightRangeMode: PathView.StrictlyEnforceRange
-    highlightMoveDuration: Tokens.anim.durations.expressiveDefaultSpatial
+    highlightMoveDuration: moveDuration
 
     delegate: WallpaperItem {
         screenState: root.screenState
@@ -125,6 +138,14 @@ PathView {
             name: "pos"
             value: root.pathItems / 2
         }
+    }
+
+    // Back to the normal speed once the index stops changing quickly
+    Timer {
+        id: moveReset
+
+        interval: 250
+        onTriggered: root.moveDuration = Tokens.anim.durations.expressiveDefaultSpatial
     }
 
     CustomMouseArea {
