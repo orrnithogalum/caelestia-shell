@@ -49,6 +49,9 @@ PathView {
         return visible;
     }
 
+    // Extra item on each side so items can shrink out/grow in at the edges while scrolling
+    readonly property int pathItems: Math.min(numItems + 2, count)
+
     // Width of the item n slots away from the centre
     function slotWidth(n: int): real {
         if (n === 0)
@@ -84,7 +87,7 @@ PathView {
     }
 
     implicitWidth: totalWidth(numItems)
-    pathItemCount: numItems
+    pathItemCount: numItems > 0 ? pathItems : 0
     cacheItemCount: 4
     clip: true
 
@@ -102,7 +105,7 @@ PathView {
         mediumWidth: root.mediumWidth
         smallWidth: root.smallWidth
         gap: root.gap
-        slotSpacing: root.width / Math.max(1, root.numItems)
+        slotSpacing: root.width / Math.max(1, root.pathItems)
     }
 
     // Straight line, items get their distance from the centre (in items) from the pos attribute
@@ -112,7 +115,7 @@ PathView {
 
         PathAttribute {
             name: "pos"
-            value: -root.numItems / 2
+            value: -root.pathItems / 2
         }
         PathLine {
             x: root.width
@@ -120,7 +123,7 @@ PathView {
         }
         PathAttribute {
             name: "pos"
-            value: root.numItems / 2
+            value: root.pathItems / 2
         }
     }
 
