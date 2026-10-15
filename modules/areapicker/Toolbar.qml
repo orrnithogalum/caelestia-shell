@@ -128,7 +128,7 @@ StyledRect {
         property string text
 
         anchors.top: parent.bottom
-        anchors.topMargin: Tokens.spacing.small
+        anchors.topMargin: Tokens.spacing.medium
         anchors.horizontalCenter: parent.horizontalCenter
 
         active: opacity > 0
@@ -148,7 +148,7 @@ StyledRect {
                 anchors.centerIn: parent
                 text: hintLabel.text
                 color: Colours.palette.m3inverseOnSurface
-                font: Tokens.font.label.large
+                font: Tokens.font.label.medium
             }
         }
 
