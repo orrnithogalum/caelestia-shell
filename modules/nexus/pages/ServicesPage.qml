@@ -215,20 +215,5 @@ PageBase {
             active: root.gpuItems[GlobalConfig.services.gpuType]
             onSelected: item => GlobalConfig.services.gpuType = root.gpuItems.indexOf(item)
         }
-
-        // Screenshots
-        SectionHeader {
-            text: Tr.tr("Screenshots")
-        }
-
-        ToggleRow {
-            first: true
-            last: true
-            // TRANSLATORS: Print = the Print Screen key
-            text: Tr.tr("Print opens screenshot tool")
-            subtext: Tr.tr("Replaces the Print bind from your Hyprland config")
-            checked: GlobalConfig.services.bindPrintScreen
-            onToggled: GlobalConfig.services.bindPrintScreen = checked
-        }
     }
 }

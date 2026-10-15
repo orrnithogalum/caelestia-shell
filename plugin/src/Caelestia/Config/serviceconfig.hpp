@@ -37,8 +37,6 @@ class ServiceConfig : public settings::ObjectNode {
     CONFIG_GLOBAL_PROPERTY(qreal, brightnessIncrement, 0.1)
     CONFIG_GLOBAL_PROPERTY(qreal, maxVolume, 1.0)
     CONFIG_GLOBAL_PROPERTY(bool, smartScheme, true)
-    // Bind Print to the screenshot tool, replacing any Print bind from the Hyprland config
-    CONFIG_GLOBAL_PROPERTY(bool, bindPrintScreen, true)
     CONFIG_GLOBAL_PROPERTY(QString, defaultPlayer, u"Spotify"_s)
     CONFIG_GLOBAL_LIST(PlayerAliasList, playerAliases,
         DEFAULT_ARG({
